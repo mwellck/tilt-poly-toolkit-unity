@@ -14,15 +14,17 @@
 
 using System.Collections.Generic;
 using System;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+
 using UnityEditor;
 using UnityEngine;
 
 namespace TiltBrushToolkit {
 
 public class ModelImportSettings : AssetPostprocessor {
-  readonly Version kToolkitVersion            = new Version { major=16 };
+  private readonly Version kToolkitVersion = TbtSettings.Version;
   readonly Version kRequiredFbxExportVersion  = new Version { major=10 };
 
   public static bool sm_forceOldMeshNamingConvention = false;
@@ -31,6 +33,19 @@ public class ModelImportSettings : AssetPostprocessor {
 
   private bool IsTiltBrush { get { return m_Info.tiltBrushVersion != null; } }
 
+  // Similar to our ListExtensions.SetCount() but only handles resizing upwards.
+  // New values are default-initialized.
+  static void ListSetCount<T>(List<T> lst, int newCount) where T : struct {
+    int delta = newCount - lst.Count;
+    Debug.Assert(delta >= 0);
+    if (delta > 0) {
+      lst.Capacity = newCount;
+      for (int i = 0; i < delta; ++i) {
+        lst.Add(default(T));
+      }
+    }
+  }
+
   // UVs come as four float2s so go through them and pack them back into two float4s
   static void CollapseUvs(Mesh mesh) {
     var finalUVs = new List<List<Vector4>>();
@@ -38,26 +53,42 @@ public class ModelImportSettings : AssetPostprocessor {
       var sourceUVs = new List<Vector2>();
       var targetUVs = new List<Vector4>();
       int iFbxChannel = 2 * iUnityChannel;
-      mesh.GetUVs(iFbxChannel, targetUVs);
-      mesh.GetUVs(iFbxChannel + 1, sourceUVs);
-      if (sourceUVs.Count > 0 || targetUVs.Count > 0) {
-        for (int i = 0; i < sourceUVs.Count; i++) {
-          if (i < targetUVs.Count) {
-            // Repack xy into zw
-            var v4 = targetUVs[i];
-            v4.z = sourceUVs[i].x;
-            v4.w = sourceUVs[i].y;
-            targetUVs[i] = v4;
-          } else {
-            targetUVs.Add(new Vector4(0, 0, sourceUVs[i].x, sourceUVs[i].y));
-          }
+      mesh.GetUVs(iFbxChannel, targetUVs);  // aka "uv0" in comments below
+      mesh.GetUVs(iFbxChannel + 1, sourceUVs);  // aka "uv1" in comments below
+      // In Unity, texcoord array lengths are always either 0 or vertexCount.
+      // We aren't guaranteed that the fbx's texcoord arrays come in matched pairs, so we
+      // have to deal with 4 cases: only uv0 empty, only uv1 empty, neither empty, both empty.
+      // Recent Tilt Brush won't generate .fbx with "gaps" in the UV channels, so the
+      // "only uv0 empty" case is only seen with old/legacy fbx exports.
+      if (targetUVs.Count <= sourceUVs.Count) {
+        // cases: both empty, neither empty, only uv0 empty
+        int count = sourceUVs.Count;
+
+        // Handles the uv0-empty case; only needed for legacy reasons.
+        ListSetCount(targetUVs, count);
+
+        // Pack source.xy into target.zw
+        for (int i = 0; i < count; i++) {
+          var v4 = targetUVs[i];
+          v4.z = sourceUVs[i].x;
+          v4.w = sourceUVs[i].y;
+          targetUVs[i] = v4;
         }
+      } else {
+        // case: only uv1 empty.
+        // Nothing to do.
+        Debug.Assert(sourceUVs.Count == 0);
+        targetUVs = null;  // Use null to indicate "unchanged"
       }
       finalUVs.Add(targetUVs);
     }
+
     for (int i = 0; i < finalUVs.Count; i++) {
-      mesh.SetUVs(i, finalUVs[i]);
+      if (finalUVs[i] != null) {
+        mesh.SetUVs(i, finalUVs[i]);
+      }
     }
+
     // Clear unused uv sets
     mesh.SetUVs(2, new List<Vector2>());
     mesh.SetUVs(3, new List<Vector2>());
@@ -131,8 +162,53 @@ public class ModelImportSettings : AssetPostprocessor {
     }
   }
 
-  // Try to find a Tilt Brush material using the imported models's material name
+  // Returns a Material which is also an asset.
+  // The resulting asset will be somehere "nearby" relatedAssetPath.
+  Material GetOrCreateAsset(Material material, string relatedAssetPath) {
+    // You can't add assets to a .fbx unless you're Unity.
+    // So instead, put it in a loose .mat near the fbx.
+    // This also allows the user to customize the material if they want.
+    string objAssetPath = Path.Combine(
+        Path.GetDirectoryName(relatedAssetPath), $"{material.name}.mat");
+
+    // If it already exists on disk, it came either from a previous import, or (more likely)
+    // from a previous OnAssignMaterialModel for a material of the same name.
+    // We can't tell the difference, but our desired behavior in both cases is the same.
+    Material existing = AssetDatabase.LoadAssetAtPath<Material>(objAssetPath);
+    if (existing != null) {
+      return existing;
+    } else {
+      AssetDatabase.CreateAsset(material, objAssetPath);
+      return material;
+    }
+  }
+
+  // Sets the first texture-valued property on mtl, based on the properties required by its shader.
+  void SetFirstShaderTexture(Material material, Texture texture) {
+    var shader = material.shader;
+    for (int i = 0; i < ShaderUtil.GetPropertyCount(shader); ++i) {
+      if (ShaderUtil.GetPropertyType(shader, i) == ShaderUtil.ShaderPropertyType.TexEnv) {
+        material.SetTexture(ShaderUtil.GetPropertyName(shader, i), texture);
+        return;
+      }
+    }
+  }
+
+  // Returns true if this is a BrushDescriptor meant to be cloned and customized rather
+  // than used directly, to support things like gltf PbrMetallicRoughness or
+  // double-sided/non-culling materials in fbx
+  bool IsTemplateDescriptor(BrushDescriptor desc) {
+    return desc.name.StartsWith("Pbr");  // hacky but works for now
+  }
+
+  // Try to find a Tilt Brush material using the imported models's material name.
   Material OnAssignMaterialModel(Material material, Renderer renderer) {
+    // This gets called once for each (Renderer, Material) pair.
+    // However, Unity passes a fresh Material every time, even if two FbxNodes use the
+    // same FbxMaterial. Therefore we can't distinguish between "two unique materials with
+    // the same name" and "one material being used multiple times".
+    // Therefore we have to rely on the exporter using distinct names.
+
     // Ignore models that aren't Tilt Brush - generated FBXs
     if (! IsTiltBrush) {
       return null;
@@ -142,6 +218,21 @@ public class ModelImportSettings : AssetPostprocessor {
     BrushDescriptor desc = GetDescriptorForStroke(material.name);
 
     if (desc != null) {
+      if (IsTemplateDescriptor(desc)) {
+        // Replace shader with our own so we get culling and so on.
+
+        // First 32 characters are the guid and underscore
+        material.name = material.name.Substring(33);
+        material.shader = desc.m_Material.shader;
+        // Our shaders don't use "_MainTex", so we need to find the correct property name.
+        SetFirstShaderTexture(material, material.mainTexture);
+        // If we return null, Unity will ignore our material mutations.
+        // If we return the material, Unity complains it's not an asset instead of making it one
+        // and embedding it in the fbx.
+        // So create one explicitly.
+        return GetOrCreateAsset(material, this.assetPath);
+      }
+
       // This is a stroke mesh and needs postprocessing.
       if (renderer.GetComponent<MeshFilter>() != null) {
         var mesh = renderer.GetComponent<MeshFilter>().sharedMesh;
@@ -197,11 +288,22 @@ public class ModelImportSettings : AssetPostprocessor {
   }
 
   // Convert from fbx coordinate conventions to Unity coordinate conventions
-  static Vector3 UnityFromFbx(Vector3 v) {
-    return new Vector3(-v.x, v.y, v.z);
+  static void InPlaceUnityFromFbx(List<Vector3> vs) {
+    var length = vs.Count;
+    for (int i = 0; i < length; ++i) {
+      var val = vs[i];
+      val.x = -val.x;
+      vs[i] = val;
+    }
   }
-  static Vector4 UnityFromFbx(Vector4 v) {
-    return new Vector4(-v.x, v.y, v.z, v.w);
+
+  static void InPlaceUnityFromFbx(List<Vector4> vs) {
+    var length = vs.Count;
+    for (int i = 0; i < length; ++i) {
+      var val = vs[i];
+      val.x = -val.x;
+      vs[i] = val;
+    }
   }
 
   static BrushDescriptor.Semantic GetUvsetSemantic(BrushDescriptor desc, int uvSet) {
@@ -263,16 +365,12 @@ public class ModelImportSettings : AssetPostprocessor {
       if (size == 3) {
         var data = new List<Vector3>();
         mesh.GetUVs(uvSet, data);
-        for (int i = 0; i < data.Count; ++i) {
-          data[i] = UnityFromFbx(data[i]);
-        }
+        InPlaceUnityFromFbx(data);
         mesh.SetUVs(uvSet, data);
       } else if (size == 4) {
         var data = new List<Vector4>();
         mesh.GetUVs(uvSet, data);
-        for (int i = 0; i < data.Count; ++i) {
-          data[i] = UnityFromFbx(data[i]);
-        }
+        InPlaceUnityFromFbx(data);
         mesh.SetUVs(uvSet, data);
       } else {
         LogWarningWithContext(string.Format(
@@ -285,7 +383,7 @@ public class ModelImportSettings : AssetPostprocessor {
   void OnPostprocessModel(GameObject g) {
     // For backwards compatibility, if people have projects that use the old naming
     if (sm_forceOldMeshNamingConvention) {
-      Dictionary<Material, BrushDescriptor> lookup = BrushManifest.Instance.AllBrushes
+      Dictionary<Material, BrushDescriptor> lookup = TbtSettings.BrushManifest.AllBrushes
           .ToDictionary(desc => desc.m_Material);
       ChangeNamesRecursive(lookup, d => d.m_DurableName + "_geo", g.transform);
     }
@@ -339,7 +437,7 @@ public class ModelImportSettings : AssetPostprocessor {
     if (match.Success) {
       Guid brushGuid = new Guid(match.Groups[1].Value);
       try {
-        return BrushManifest.Instance.BrushesByGuid[brushGuid];
+        return TbtSettings.BrushManifest.BrushesByGuid[brushGuid];
       } catch (KeyNotFoundException) {
         LogWarningWithContext(string.Format(
             "Unexpected: Couldn't find Tilt Brush material for guid {0}.",
@@ -350,7 +448,7 @@ public class ModelImportSettings : AssetPostprocessor {
 
     // Older versions use material.name == brush.m_DurableName
     {
-      var descs = BrushManifest.Instance.BrushesByName[oldMaterialName].ToArray();
+      var descs = TbtSettings.BrushManifest.BrushesByName[oldMaterialName].ToArray();
       if (descs.Length == 1) {
         return descs[0];
       } else if (descs.Length > 1) {

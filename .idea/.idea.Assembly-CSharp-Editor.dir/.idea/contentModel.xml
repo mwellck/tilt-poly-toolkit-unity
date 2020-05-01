@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ContentModelStore">
+    <e p="C:\Users\wellb\.Rider2019.3\system\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\wellb\.Rider2019.3\system\resharper-host\local\Transient\ReSharperHost\v193\SolutionCaches\_.19.00" t="ExcludeRecursive" />
+    <e p="C:\Users\wellb\Documents\GitHub\tilt-poly-toolkit-unity" t="IncludeRecursive">
+      <e p="Assembly-CSharp-Editor.csproj" t="IncludeRecursive" />
+      <e p="Assets" t="Include">
+        <e p="PolyToolkit" t="Include">
+          <e p="Editor" t="Include">
+            <e p="AnalyticsSender.cs" t="Include" />
+            <e p="AssetBrowser" t="Include">
+              <e p="AssetBrowserManager.cs" t="Include" />
+              <e p="AssetBrowserWindow.cs" t="Include" />
+              <e p="GUIHelper.cs" t="Include" />
+              <e p="ThumbnailCache.cs" t="Include" />
+              <e p="WelcomeWindow.cs" t="Include" />
+            </e>
+            <e p="CheckBuild.cs" t="Include" />
+            <e p="DummyVERSION.txt" t="Include" />
+            <e p="Importer" t="Include">
+              <e p="AttributionFileGenerator.cs" t="Include" />
+              <e p="PolyImporter.cs" t="Include" />
+            </e>
+            <e p="PostInstallHandler.cs" t="Include" />
+            <e p="PtAnalytics.cs" t="Include" />
+            <e p="PtSettingsEditor.cs" t="Include" />
+            <e p="PtUtils.cs" t="Include" />
+            <e p="WarnAboutUsingPolyInternal.cs" t="Include" />
+            <e p="WarnIfManagerNotInScene.cs" t="Include" />
+          </e>
+        </e>
+        <e p="TiltBrush" t="Include">
+          <e p="Scripts" t="Include">
+            <e p="Editor" t="Include">
+              <e p="EditorUtils.cs" t="Include" />
+              <e p="FbxUtils.cs" t="Include" />
+              <e p="GammaSettings.cs" t="Include" />
+              <e p="Glb1Importer.cs" t="Include" />
+              <e p="Glb2Importer.cs" t="Include" />
+              <e p="ModelImportSettings.cs" t="Include" />
+              <e p="ParticleMesh.cs" t="Include" />
+              <e p="VisualizerManagerEditor.cs" t="Include" />
+            </e>
+          </e>
+          <e p="ThirdParty" t="Include">
+            <e p="Reaktion" t="Include">
+              <e p="Editor" t="Include">
+                <e p="Gear" t="Include">
+                  <e p="AnimatorGearEditor.cs" t="Include" />
+                  <e p="CameraGearEditor.cs" t="Include" />
+                  <e p="ConstantMotionGearEditor.cs" t="Include" />
+                  <e p="GenericCurveGearEditor.cs" t="Include" />
+                  <e p="GenericGradientGearEditor.cs" t="Include" />
+                  <e p="GenericTriggerGearEditor.cs" t="Include" />
+                  <e p="GlobalSettingGearEditor.cs" t="Include" />
+                  <e p="JitterMotionGearEditor.cs" t="Include" />
+                  <e p="LightGearEditor.cs" t="Include" />
+                  <e p="MaterialGearEditor.cs" t="Include" />
+                  <e p="ParticleSystemGearEditor.cs" t="Include" />
+                  <e p="SpawnerGearEditor.cs" t="Include" />
+                  <e p="TransformGearEditor.cs" t="Include" />
+                </e>
+                <e p="Injector" t="Include">
+                  <e p="AudioInjectorEditor.cs" t="Include" />
+                </e>
+                <e p="Internal" t="Include">
+                  <e p="GenericLinkDrawer.cs" t="Include" />
+                  <e p="ModifierDrawer.cs" t="Include" />
+                  <e p="RemoteDrawer.cs" t="Include" />
+                  <e p="TriggerDrawer.cs" t="Include" />
+                </e>
+                <e p="Reaktor" t="Include">
+                  <e p="ReaktorEditor.cs" t="Include" />
+                </e>
+                <e p="Utility" t="Include">
+                  <e p="BandPassFilterEditor.cs" t="Include" />
+                  <e p="ConstantMotionEditor.cs" t="Include" />
+                  <e p="GenericAudioInputEditor.cs" t="Include" />
+                  <e p="JitterMotionEditor.cs" t="Include" />
+                  <e p="ObjectParticleSystem.cs" t="Include" />
+                  <e p="PlanterEditor.cs" t="Include" />
+                  <e p="ReaktionWindow.cs" t="Include" />
+                  <e p="SelfDestructionEditor.cs" t="Include" />
+                  <e p="SpawnerEditor.cs" t="Include" />
+                  <e p="TurbulentMotionEditor.cs" t="Include" />
+                  <e p="VariableMotionEditor.cs" t="Include" />
+                </e>
+              </e>
+            </e>
+          </e>
+        </e>
+      </e>
+      <e p="obj" t="ExcludeRecursive" />
+      <e p="packages" t="ExcludeRecursive" />
+      <e p="Temp\bin" t="ExcludeRecursive" />
+    </e>
+  </component>
+</project>

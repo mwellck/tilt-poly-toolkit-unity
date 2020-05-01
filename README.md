@@ -7,7 +7,7 @@ This allows you to use assets from the [Google Poly website](https://poly.google
 For more information, refer to the [Poly online
 documentation](https://developers.google.com/poly/develop/unity) or the [Tilt Brush online documentation](https://docs.google.com/document/d/1YID89te9oDjinCkJ9R65bLZ3PpJk1W4S1SM2Ccc6-9w/).
 
-Note: _Poly Toolkit version: v1.1.2_ | _Tilt Brush Toolkit version: v22.0.0_
+Note: _Poly Toolkit version: v1.1.2_ | _Tilt Brush Toolkit version: v23.0.1_
 
 _Unity is a trademark of Unity Technologies._
 
